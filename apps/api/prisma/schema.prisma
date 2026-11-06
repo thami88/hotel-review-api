@@ -1,0 +1,130 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum PlatformRole {
+  USER
+  SUPER_ADMIN
+}
+
+enum HotelRole {
+  ADMIN
+}
+
+enum ReviewVisibility {
+  PUBLISHED
+  HIDDEN
+}
+
+enum AuditActorType {
+  USER
+  GUEST
+  SYSTEM
+}
+
+model Hotel {
+  id        String    @id @default(uuid()) @db.Uuid
+  name      String    @db.VarChar(200)
+  slug      String    @unique @db.VarChar(100)
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(3)
+  deletedAt DateTime? @db.Timestamptz(3)
+
+  memberships HotelMembership[]
+  invitations ReviewInvitation[]
+  reviews     Review[]
+  auditEvents AuditEvent[]
+}
+
+model User {
+  id           String       @id @default(uuid()) @db.Uuid
+  email        String       @unique @db.VarChar(320)
+  name         String       @db.VarChar(150)
+  platformRole PlatformRole @default(USER)
+  isActive     Boolean      @default(true)
+  createdAt    DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime     @updatedAt @db.Timestamptz(3)
+  deletedAt    DateTime?    @db.Timestamptz(3)
+
+  memberships HotelMembership[]
+}
+
+model HotelMembership {
+  id        String    @id @default(uuid()) @db.Uuid
+  hotelId   String    @db.Uuid
+  userId    String    @db.Uuid
+  role      HotelRole @default(ADMIN)
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(3)
+
+  hotel Hotel @relation(fields: [hotelId], references: [id], onDelete: Restrict)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([hotelId, userId])
+  @@index([userId])
+}
+
+model ReviewInvitation {
+  id        String    @id @default(uuid()) @db.Uuid
+  hotelId   String    @db.Uuid
+  tokenHash String    @unique @db.VarChar(64)
+  expiresAt DateTime  @db.Timestamptz(3)
+  usedAt    DateTime? @db.Timestamptz(3)
+  revokedAt DateTime? @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+
+  hotel  Hotel   @relation(fields: [hotelId], references: [id], onDelete: Restrict)
+  review Review?
+
+  @@unique([id, hotelId])
+  @@index([hotelId, createdAt])
+}
+
+model Review {
+  id           String           @id @default(uuid()) @db.Uuid
+  hotelId      String           @db.Uuid
+  invitationId String           @unique @db.Uuid
+  displayName  String           @db.VarChar(100)
+  rating       Int              @db.SmallInt
+  comment      String           @db.VarChar(5000)
+  visibility   ReviewVisibility @default(PUBLISHED)
+  version      Int              @default(1)
+  createdAt    DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime         @updatedAt @db.Timestamptz(3)
+  deletedAt    DateTime?        @db.Timestamptz(3)
+  deletedBy    String?          @db.Uuid
+  deleteReason String?          @db.VarChar(1000)
+
+  hotel Hotel @relation(fields: [hotelId], references: [id], onDelete: Restrict)
+
+  invitation ReviewInvitation @relation(fields: [invitationId, hotelId], references: [id, hotelId], onDelete: Restrict)
+
+  @@unique([invitationId, hotelId])
+  @@index([hotelId, visibility, deletedAt, createdAt, id])
+}
+
+model AuditEvent {
+  id         String         @id @default(uuid()) @db.Uuid
+  hotelId    String?        @db.Uuid
+  actorType  AuditActorType
+  actorId    String?        @db.Uuid
+  action     String         @db.VarChar(100)
+  entityType String         @db.VarChar(100)
+  entityId   String         @db.VarChar(100)
+  changes    Json?
+  reason     String?        @db.VarChar(1000)
+  requestId  String?        @db.VarChar(100)
+  createdAt  DateTime       @default(now()) @db.Timestamptz(3)
+
+  hotel Hotel? @relation(fields: [hotelId], references: [id], onDelete: Restrict)
+
+  @@index([hotelId, createdAt, id])
+  @@index([entityType, entityId, createdAt])
+}
