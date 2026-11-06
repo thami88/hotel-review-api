@@ -1,0 +1,12 @@
+{
+  "name": "hotel-review-platform",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --parallel --filter @hotel/web --filter @hotel/api run dev",
+    "dev:web": "pnpm --filter @hotel/web dev",
+    "dev:api": "pnpm --filter @hotel/api dev",
+    "build": "pnpm -r run build"
+  },
+  "packageManager": "pnpm@12.18.0"
+}
